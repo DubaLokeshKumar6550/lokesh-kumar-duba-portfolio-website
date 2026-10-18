@@ -1,0 +1,14 @@
+{
+  "name": "portfolio-website-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Full Stack Developer Portfolio - Duba Lokesh Kumar",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "backend": "cd backend && java -jar target/portfolio-backend-1.0.0.jar",
+    "backend:dev": "cd backend && java -Dspring.profiles.active=dev -jar target/portfolio-backend-1.0.0.jar",
+    "start": "npm --prefix frontend run dev"
+  }
+}
