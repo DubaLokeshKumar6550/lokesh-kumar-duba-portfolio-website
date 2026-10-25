@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { loginAdmin, forgotPassword, resetPassword } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { loginAdmin, forgotPassword, resetPassword, checkBackendHealth } from '../services/api';
 import { Shield, Lock, User, ArrowLeft, AlertCircle, CheckCircle2, KeyRound, Mail, RefreshCw } from 'lucide-react';
 
 export default function AdminLoginPage({ onLoginSuccess, onBackToPortfolio, showToast }) {
@@ -21,6 +21,26 @@ export default function AdminLoginPage({ onLoginSuccess, onBackToPortfolio, show
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
+  // Backend connection status
+  const [backendStatus, setBackendStatus] = useState(null); // null | 'online' | 'offline'
+  const [checkingBackend, setCheckingBackend] = useState(false);
+
+  const verifyBackend = async () => {
+    setCheckingBackend(true);
+    try {
+      const health = await checkBackendHealth();
+      setBackendStatus(health.isOnline ? 'online' : 'offline');
+    } catch {
+      setBackendStatus('offline');
+    } finally {
+      setCheckingBackend(false);
+    }
+  };
+
+  useEffect(() => {
+    verifyBackend();
+  }, []);
+
   // --- Handlers ---
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -36,12 +56,17 @@ export default function AdminLoginPage({ onLoginSuccess, onBackToPortfolio, show
     try {
       const res = await loginAdmin(username.trim(), password);
       if (res && res.success) {
+        setBackendStatus('online');
         if (showToast) showToast('Authenticated successfully as Portfolio Administrator!');
         onLoginSuccess();
       } else {
+        if (res?.message?.includes('8080')) {
+          setBackendStatus('offline');
+        }
         setError(res?.message || 'Invalid administrator credentials. Access restricted to portfolio owner.');
       }
     } catch (err) {
+      setBackendStatus('offline');
       setError('Authentication failed. Check your network or credentials.');
     } finally {
       setLoading(false);
@@ -210,6 +235,70 @@ export default function AdminLoginPage({ onLoginSuccess, onBackToPortfolio, show
               {mode === 'forgot' && 'Enter your registered email to receive a reset code'}
               {mode === 'reset' && 'Verify your code and create a secure password'}
             </p>
+
+            {/* Backend Connectivity Status Badge */}
+            <div style={{ marginTop: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={verifyBackend}
+                disabled={checkingBackend}
+                title="Click to check backend connection"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '999px',
+                  background: backendStatus === 'online'
+                    ? 'rgba(16, 185, 129, 0.12)'
+                    : backendStatus === 'offline'
+                    ? 'rgba(239, 68, 68, 0.12)'
+                    : 'rgba(255, 255, 255, 0.05)',
+                  border: `1px solid ${
+                    backendStatus === 'online'
+                      ? 'rgba(16, 185, 129, 0.3)'
+                      : backendStatus === 'offline'
+                      ? 'rgba(239, 68, 68, 0.3)'
+                      : 'rgba(255, 255, 255, 0.1)'
+                  }`,
+                  color: backendStatus === 'online'
+                    ? '#34d399'
+                    : backendStatus === 'offline'
+                    ? '#f87171'
+                    : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <span
+                  style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    background: backendStatus === 'online' ? '#10b981' : backendStatus === 'offline' ? '#ef4444' : '#94a3b8',
+                    boxShadow: backendStatus === 'online' ? '0 0 8px #10b981' : 'none'
+                  }}
+                />
+                <span>
+                  {checkingBackend
+                    ? 'Testing connection...'
+                    : backendStatus === 'online'
+                    ? 'Backend Online (Port 8080)'
+                    : backendStatus === 'offline'
+                    ? 'Backend Offline (Port 8080)'
+                    : 'Checking connection...'}
+                </span>
+                <RefreshCw
+                  size={11}
+                  style={{
+                    opacity: 0.7,
+                    animation: checkingBackend ? 'spin 1s linear infinite' : 'none'
+                  }}
+                />
+              </button>
+            </div>
           </div>
 
           {/* Success Message Banner */}
@@ -235,22 +324,46 @@ export default function AdminLoginPage({ onLoginSuccess, onBackToPortfolio, show
 
           {/* Error Message Banner */}
           {error && (
-            <div
-              style={{
-                padding: '0.85rem 1rem',
-                borderRadius: 'var(--radius-md)',
-                background: 'rgba(244, 63, 94, 0.12)',
-                border: '1px solid rgba(244, 63, 94, 0.3)',
-                color: '#fb7185',
-                marginBottom: '1.5rem',
-                fontSize: '0.85rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              <AlertCircle size={16} />
-              <span>{error}</span>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div
+                style={{
+                  padding: '0.85rem 1rem',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'rgba(244, 63, 94, 0.12)',
+                  border: '1px solid rgba(244, 63, 94, 0.3)',
+                  color: '#fb7185',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{error}</span>
+              </div>
+              {error.includes('8080') && (
+                <div
+                  style={{
+                    marginTop: '0.75rem',
+                    padding: '0.75rem 1rem',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'rgba(15, 23, 42, 0.75)',
+                    border: '1px solid rgba(56, 189, 248, 0.2)',
+                    fontSize: '0.78rem',
+                    color: 'var(--text-secondary)'
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: '#f8fafc', marginBottom: '0.35rem' }}>
+                    💡 How to start the backend:
+                  </div>
+                  <div style={{ marginBottom: '0.25rem' }}>
+                    • Double-click <code style={{ color: 'var(--accent-cyan)' }}>run-portfolio.bat</code> in the project folder
+                  </div>
+                  <div>
+                    • Or run in terminal: <code style={{ color: 'var(--accent-cyan)' }}>npm run backend</code>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
