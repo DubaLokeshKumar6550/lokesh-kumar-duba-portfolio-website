@@ -6,8 +6,11 @@ import com.lokesh.portfolio.service.PortfolioService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api")
@@ -106,5 +109,72 @@ public class PortfolioController {
     public ResponseEntity<ApiResponse<Void>> deleteCertification(@PathVariable Long id) {
         portfolioService.deleteCertification(id);
         return ResponseEntity.ok(ApiResponse.ok("Certification deleted successfully", null));
+    }
+
+    // --- Direct File Upload for Profile Photo and Resume ---
+    @PostMapping("/admin/upload")
+    public ResponseEntity<ApiResponse<Map<String, String>>> uploadFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "type", required = false) String type) {
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Please select a file to upload."));
+        }
+        try {
+            String originalName = file.getOriginalFilename();
+            String extension = "";
+            if (originalName != null && originalName.contains(".")) {
+                extension = originalName.substring(originalName.lastIndexOf(".")).toLowerCase();
+            }
+
+            String targetFilename;
+            if ("photo".equalsIgnoreCase(type)) {
+                targetFilename = "lokesh-photo" + (extension.isEmpty() ? ".jpg" : extension);
+            } else if ("resume".equalsIgnoreCase(type)) {
+                targetFilename = "Duba_Lokesh_Kumar_Resume" + (extension.isEmpty() ? ".pdf" : extension);
+            } else {
+                targetFilename = System.currentTimeMillis() + "_" + (originalName != null ? originalName.replaceAll("[^a-zA-Z0-9._-]", "_") : "file");
+            }
+
+            java.nio.file.Path[] targetDirs = new java.nio.file.Path[] {
+                java.nio.file.Paths.get("..", "frontend", "public"),
+                java.nio.file.Paths.get("..", "public"),
+                java.nio.file.Paths.get("..", "frontend", "dist")
+            };
+
+            byte[] bytes = file.getBytes();
+            for (java.nio.file.Path dir : targetDirs) {
+                try {
+                    if (java.nio.file.Files.exists(dir)) {
+                        java.nio.file.Path destination = dir.resolve(targetFilename);
+                        java.nio.file.Files.write(destination, bytes,
+                                java.nio.file.StandardOpenOption.CREATE,
+                                java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+                    }
+                } catch (Exception ex) {
+                    System.err.println("Could not copy uploaded file to " + dir + ": " + ex.getMessage());
+                }
+            }
+
+            String publicUrl = "/" + targetFilename;
+            Map<String, String> data = new HashMap<>();
+            data.put("url", publicUrl);
+            data.put("filename", targetFilename);
+            data.put("originalName", originalName);
+
+            // Immediately update the profile in the database
+            portfolioService.getProfile().ifPresent(p -> {
+                if ("photo".equalsIgnoreCase(type)) {
+                    p.setPhotoUrl(publicUrl);
+                    portfolioService.saveOrUpdateProfile(p);
+                } else if ("resume".equalsIgnoreCase(type)) {
+                    p.setResumeUrl(publicUrl);
+                    portfolioService.saveOrUpdateProfile(p);
+                }
+            });
+
+            return ResponseEntity.ok(ApiResponse.ok("File uploaded successfully and saved to portfolio!", data));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(ApiResponse.error("Failed to process file upload: " + e.getMessage()));
+        }
     }
 }

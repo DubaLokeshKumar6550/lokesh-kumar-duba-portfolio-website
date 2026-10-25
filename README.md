@@ -73,7 +73,7 @@ The system is built on a decoupled, production-grade 3-tier architecture:
 - **Dedicated Project URLs**: Reusable project detail templates accessible at `/projects/:slug`.
 
 ### 5. Protected Dynamic Admin Dashboard
-- Secure login portal at `/admin` (Default: `admin` / `AdminPassword@2026`).
+- Secure login portal at `/admin` (Restricted to portfolio administrator with Forgot Password verification).
 - Complete content management without touching code:
   - **Add New Projects**: Publish future systems (e.g. *Student Management System*, *Hospital Management System*, *Secure Online Exam Platform*) with status set to *Planned*, *In Progress*, or *Completed*.
   - **Edit Projects**: Update titles, taglines, problem statements, solutions, architecture diagrams, technologies, features, and links.
@@ -142,11 +142,11 @@ npm run dev
 
 ---
 
-## 🔑 Admin Portal Credentials
+## 🔑 Admin Portal Access
 
 - **URL:** `http://localhost:5173/admin`
-- **Username:** `admin`
-- **Password:** `AdminPassword@2026`
+- **Username / Email:** `admin` or `dubalokeshkumar6550@gmail.com`
+- **Password:** Configured securely. Use the **Forgot Password** option on the login portal to generate a 6-digit verification code and set your private password.
 
 ---
 

@@ -30,6 +30,15 @@ public class ContactMessage {
         this.createdAt = LocalDateTime.now();
     }
 
+    public ContactMessage(String name, String email, String subject, String message) {
+        this.name = name;
+        this.email = email;
+        this.subject = subject;
+        this.message = message;
+        this.createdAt = LocalDateTime.now();
+        this.isRead = false;
+    }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

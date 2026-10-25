@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Github } from '../components/Icons';
 import {
   checkBackendHealth,
@@ -13,7 +13,8 @@ import {
   getAdminMessages,
   markMessageRead,
   deleteMessage,
-  logoutAdmin
+  logoutAdmin,
+  uploadFile
 } from '../services/api';
 import {
   FolderGit2,
@@ -37,7 +38,12 @@ import {
   Server,
   Layers,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  FileText,
+  Download,
+  Image as ImageIcon,
+  FolderOpen,
+  Camera
 } from 'lucide-react';
 
 export default function AdminDashboardPage({
@@ -66,6 +72,73 @@ export default function AdminDashboardPage({
 
   // Profile Form State
   const [profileForm, setProfileForm] = useState({ ...profile });
+  const photoInputRef = useRef(null);
+  const resumeInputRef = useRef(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
+
+  const handlePhotoFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (JPG, PNG, WEBP, etc.)');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    const localPreview = URL.createObjectURL(file);
+    setProfileForm((prev) => ({ ...prev, photoUrl: localPreview }));
+
+    try {
+      const res = await uploadFile(file, 'photo');
+      if (res && res.success) {
+        setProfileForm((prev) => ({ ...prev, photoUrl: res.data.url }));
+        if (showToast) showToast('Profile photo updated successfully from File Explorer!');
+        onRefreshData();
+      } else {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setProfileForm((prev) => ({ ...prev, photoUrl: ev.target.result }));
+        };
+        reader.readAsDataURL(file);
+        if (showToast) showToast('Photo loaded from File Explorer! Click "Save & Publish" to commit.');
+      }
+    } catch (err) {
+      console.error('Photo upload error:', err);
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  };
+
+  const handleResumeFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      alert('Please select a PDF file (.pdf)');
+      return;
+    }
+
+    setUploadingResume(true);
+    try {
+      const res = await uploadFile(file, 'resume');
+      if (res && res.success) {
+        setProfileForm((prev) => ({ ...prev, resumeUrl: res.data.url }));
+        if (showToast) showToast(`Resume "${file.name}" updated successfully from File Explorer!`);
+        onRefreshData();
+      } else {
+        setProfileForm((prev) => ({ ...prev, resumeUrl: `/${file.name}` }));
+        if (showToast) showToast(`Resume set to /${file.name}. Click "Save & Publish" to commit.`);
+      }
+    } catch (err) {
+      console.error('Resume upload error:', err);
+    } finally {
+      setUploadingResume(false);
+      if (resumeInputRef.current) resumeInputRef.current.value = '';
+    }
+  };
 
   // Project Form State
   const [projectForm, setProjectForm] = useState({
@@ -126,7 +199,7 @@ export default function AdminDashboardPage({
     try {
       const msgs = await getAdminMessages();
       setMessages(msgs || []);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleLogout = () => {
@@ -481,13 +554,12 @@ export default function AdminDashboardPage({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem' }}>
                       <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{proj.title}</h3>
                       <span
-                        className={`badge ${
-                          proj.status === 'COMPLETED'
+                        className={`badge ${proj.status === 'COMPLETED'
                             ? 'badge-emerald'
                             : proj.status === 'IN_PROGRESS'
-                            ? 'badge-cyan'
-                            : 'badge-amber'
-                        }`}
+                              ? 'badge-cyan'
+                              : 'badge-amber'
+                          }`}
                       >
                         {proj.status}
                       </span>
@@ -698,28 +770,195 @@ export default function AdminDashboardPage({
                   />
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
-                    Profile Photo Path / URL
+                {/* Hidden File Explorer Inputs */}
+                <input
+                  type="file"
+                  ref={photoInputRef}
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={handlePhotoFileSelect}
+                />
+                <input
+                  type="file"
+                  ref={resumeInputRef}
+                  accept=".pdf,application/pdf"
+                  style={{ display: 'none' }}
+                  onChange={handleResumeFileSelect}
+                />
+
+                {/* Profile Photo Uploader Card */}
+                <div
+                  style={{
+                    background: 'rgba(15, 23, 42, 0.45)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '1.25rem'
+                  }}
+                >
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)' }}>
+                    📸 Profile Photo
                   </label>
-                  <input
-                    type="text"
-                    value={profileForm.photoUrl || ''}
-                    onChange={(e) => setProfileForm({ ...profileForm, photoUrl: e.target.value })}
-                    className="form-input"
-                  />
+
+                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Clickable Avatar Thumbnail */}
+                    <div
+                      onClick={() => photoInputRef.current && photoInputRef.current.click()}
+                      title="Click to choose a new photo from your computer"
+                      style={{
+                        position: 'relative',
+                        width: '72px',
+                        height: '72px',
+                        borderRadius: '50%',
+                        overflow: 'hidden',
+                        border: '3px solid var(--accent-cyan)',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        background: '#0f172a',
+                        boxShadow: '0 4px 14px rgba(56, 189, 248, 0.25)',
+                        transition: 'transform 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                      <img
+                        src={profileForm.photoUrl || '/lokesh-photo.jpg'}
+                        alt="Current Profile Portrait"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background: 'rgba(0, 0, 0, 0.45)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fff',
+                          opacity: 0,
+                          transition: 'opacity 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                        onMouseLeave={(e) => (e.currentTarget.style.opacity = '0')}
+                      >
+                        <Camera size={22} />
+                      </div>
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: '220px' }}>
+                      <button
+                        type="button"
+                        onClick={() => photoInputRef.current && photoInputRef.current.click()}
+                        disabled={uploadingPhoto}
+                        className="btn btn-primary"
+                        style={{ padding: '0.65rem 1.15rem', fontSize: '0.825rem', width: '100%', display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}
+                      >
+                        <FolderOpen size={16} />
+                        <span>{uploadingPhoto ? 'Uploading from Explorer...' : 'Open File Explorer to Change Photo'}</span>
+                      </button>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>Path:</span>
+                        <input
+                          type="text"
+                          placeholder="/lokesh-photo.jpg"
+                          value={profileForm.photoUrl || ''}
+                          onChange={(e) => setProfileForm({ ...profileForm, photoUrl: e.target.value })}
+                          className="form-input"
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
-                    Resume Download File Path
+                {/* Resume Document Uploader Card */}
+                <div
+                  style={{
+                    background: 'rgba(15, 23, 42, 0.45)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '1.25rem'
+                  }}
+                >
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)' }}>
+                    📄 Resume PDF
                   </label>
-                  <input
-                    type="text"
-                    value={profileForm.resumeUrl || ''}
-                    onChange={(e) => setProfileForm({ ...profileForm, resumeUrl: e.target.value })}
-                    className="form-input"
-                  />
+
+                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Clickable PDF Badge */}
+                    <div
+                      onClick={() => resumeInputRef.current && resumeInputRef.current.click()}
+                      title="Click to choose a new resume PDF from your computer"
+                      style={{
+                        position: 'relative',
+                        width: '72px',
+                        height: '72px',
+                        borderRadius: '14px',
+                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.25))',
+                        border: '2px dashed rgba(239, 68, 68, 0.5)',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#f87171',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                        e.currentTarget.style.borderColor = '#ef4444';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                      }}
+                    >
+                      <FileText size={26} />
+                      <span style={{ fontSize: '0.65rem', fontWeight: 800, marginTop: '2px', letterSpacing: '0.04em' }}>PDF</span>
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: '220px' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => resumeInputRef.current && resumeInputRef.current.click()}
+                          disabled={uploadingResume}
+                          className="btn btn-primary"
+                          style={{ padding: '0.65rem 1.15rem', fontSize: '0.825rem', flex: 1, display: 'flex', justifyContent: 'center', gap: '0.5rem' }}
+                        >
+                          <FolderOpen size={16} />
+                          <span>{uploadingResume ? 'Uploading...' : 'Open File Explorer to Change Resume'}</span>
+                        </button>
+
+                        {profileForm.resumeUrl && (
+                          <a
+                            href={profileForm.resumeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-secondary"
+                            style={{ padding: '0.65rem 0.85rem', fontSize: '0.775rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                            title="Open current resume PDF"
+                          >
+                            <Download size={14} />
+                            <span>Test</span>
+                          </a>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>Path:</span>
+                        <input
+                          type="text"
+                          placeholder="/Duba_Lokesh_Kumar_Resume.pdf"
+                          value={profileForm.resumeUrl || ''}
+                          onChange={(e) => setProfileForm({ ...profileForm, resumeUrl: e.target.value })}
+                          className="form-input"
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 

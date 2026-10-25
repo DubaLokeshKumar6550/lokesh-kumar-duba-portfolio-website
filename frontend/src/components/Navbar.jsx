@@ -170,7 +170,7 @@ export default function Navbar({ currentTheme, toggleTheme, onNavigate, activePa
           </button>
 
           <button
-            onClick={() => onNavigate('admin')}
+            onClick={() => onNavigate(activePage === 'admin-login' ? 'home' : 'admin')}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -179,15 +179,24 @@ export default function Navbar({ currentTheme, toggleTheme, onNavigate, activePa
               fontSize: '0.8rem',
               fontWeight: 600,
               borderRadius: 'var(--radius-full)',
-              background: activePage === 'admin' ? 'var(--accent-blue)' : 'rgba(56, 189, 248, 0.1)',
+              background: activePage === 'admin' || activePage === 'admin-dashboard' ? 'var(--accent-blue)' : 'rgba(56, 189, 248, 0.1)',
               border: '1px solid var(--border-subtle)',
-              color: activePage === 'admin' ? '#fff' : 'var(--accent-cyan)',
+              color: activePage === 'admin' || activePage === 'admin-dashboard' ? '#fff' : 'var(--accent-cyan)',
               cursor: 'pointer',
               transition: 'all 0.2s ease'
             }}
           >
-            <Shield size={14} />
-            <span>Admin</span>
+            {activePage === 'admin-login' ? (
+              <>
+                <ArrowUpRight size={14} style={{ transform: 'rotate(-135deg)' }} />
+                <span>Public Site</span>
+              </>
+            ) : (
+              <>
+                <Shield size={14} />
+                <span>Admin</span>
+              </>
+            )}
           </button>
 
           {/* Mobile hamburger button */}

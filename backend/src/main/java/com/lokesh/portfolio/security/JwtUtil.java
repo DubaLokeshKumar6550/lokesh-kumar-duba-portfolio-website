@@ -18,31 +18,53 @@ public class JwtUtil {
     @Value("${app.jwt.expiration-ms}")
     private long jwtExpirationMs;
 
+    @Value("${app.admin.email:dubalokeshkumar6550@gmail.com}")
+    private String defaultAdminEmail;
+
     private Key getSigningKey() {
         byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(String username) {
+        return generateToken(username, defaultAdminEmail, "ROLE_ADMIN");
+    }
+
+    public String generateToken(String username, String email, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
         return Jwts.builder()
                 .setSubject(username)
-                .claim("role", "ROLE_ADMIN")
+                .claim("email", email)
+                .claim("role", role != null ? role : "ROLE_ADMIN")
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    public String getUsernameFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
+    public Claims getClaimsFromToken(String token) {
+        return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
+    }
+
+    public String getUsernameFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
         return claims.getSubject();
+    }
+
+    public String getEmailFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        return claims.get("email", String.class);
+    }
+
+    public String getRoleFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        return claims.get("role", String.class);
     }
 
     public boolean validateToken(String token) {

@@ -87,21 +87,19 @@ export async function getProfile() {
 }
 
 export async function updateProfile(profileData) {
-  setStored('profile', profileData);
-  try {
-    const res = await fetch(`${API_BASE}/admin/profile`, {
-      method: 'PUT',
-      headers: authHeaders(),
-      body: JSON.stringify(profileData)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return data.data;
-    }
-  } catch (e) {
-    // backend offline, local state saved
+  const res = await fetch(`${API_BASE}/admin/profile`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(profileData)
+  });
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(errorJson.message || `Failed to update profile (${res.status})`);
   }
-  return profileData;
+  const data = await res.json();
+  const saved = data.data || profileData;
+  setStored('profile', saved);
+  return saved;
 }
 
 // --- Projects API ---
@@ -136,69 +134,53 @@ export async function getProjectBySlug(slug) {
 }
 
 export async function createProject(projectData) {
-  const localProjects = getStored('projects', initialProjects);
-  const newProject = {
-    ...projectData,
-    id: Date.now(),
-    slug: projectData.slug || projectData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-    createdAt: new Date().toISOString()
-  };
-  const updatedList = [newProject, ...localProjects];
-  setStored('projects', updatedList);
-
-  try {
-    const res = await fetch(`${API_BASE}/admin/projects`, {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify(projectData)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      // Replace temporary id with database id
-      const syncdList = updatedList.map(p => p.id === newProject.id ? data.data : p);
-      setStored('projects', syncdList);
-      return data.data;
-    }
-  } catch (e) {
-    // backend offline
+  const res = await fetch(`${API_BASE}/admin/projects`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(projectData)
+  });
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(errorJson.message || `Failed to create project (${res.status})`);
   }
-  return newProject;
+  const data = await res.json();
+  const created = data.data;
+  const localProjects = getStored('projects', initialProjects);
+  const updatedList = [created, ...localProjects.filter(p => p.id !== created.id)];
+  setStored('projects', updatedList);
+  return created;
 }
 
 export async function updateProject(id, projectData) {
-  const localProjects = getStored('projects', initialProjects);
-  const updatedList = localProjects.map(p => (String(p.id) === String(id) ? { ...p, ...projectData, id } : p));
-  setStored('projects', updatedList);
-
-  try {
-    const res = await fetch(`${API_BASE}/admin/projects/${id}`, {
-      method: 'PUT',
-      headers: authHeaders(),
-      body: JSON.stringify(projectData)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return data.data;
-    }
-  } catch (e) {
-    // backend offline
+  const res = await fetch(`${API_BASE}/admin/projects/${id}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(projectData)
+  });
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(errorJson.message || `Failed to update project (${res.status})`);
   }
-  return updatedList.find(p => String(p.id) === String(id));
+  const data = await res.json();
+  const updated = data.data || { ...projectData, id };
+  const localProjects = getStored('projects', initialProjects);
+  const updatedList = localProjects.map(p => (String(p.id) === String(id) ? updated : p));
+  setStored('projects', updatedList);
+  return updated;
 }
 
 export async function deleteProject(id) {
+  const res = await fetch(`${API_BASE}/admin/projects/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(errorJson.message || `Failed to delete project (${res.status})`);
+  }
   const localProjects = getStored('projects', initialProjects);
   const filtered = localProjects.filter(p => String(p.id) !== String(id));
   setStored('projects', filtered);
-
-  try {
-    await fetch(`${API_BASE}/admin/projects/${id}`, {
-      method: 'DELETE',
-      headers: authHeaders()
-    });
-  } catch (e) {
-    // backend offline
-  }
   return true;
 }
 
@@ -220,55 +202,53 @@ export async function getSkills() {
 }
 
 export async function createSkill(skillData) {
+  const res = await fetch(`${API_BASE}/admin/skills`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(skillData)
+  });
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(errorJson.message || `Failed to create skill (${res.status})`);
+  }
+  const data = await res.json();
+  const created = data.data;
   const localSkills = getStored('skills', initialSkills);
-  const newSkill = { ...skillData, id: Date.now() };
-  const updatedList = [...localSkills, newSkill];
+  const updatedList = [...localSkills.filter(s => s.id !== created.id), created];
   setStored('skills', updatedList);
-
-  try {
-    const res = await fetch(`${API_BASE}/admin/skills`, {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify(skillData)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return data.data;
-    }
-  } catch (e) {}
-  return newSkill;
+  return created;
 }
 
 export async function updateSkill(id, skillData) {
+  const res = await fetch(`${API_BASE}/admin/skills/${id}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(skillData)
+  });
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(errorJson.message || `Failed to update skill (${res.status})`);
+  }
+  const data = await res.json();
+  const updated = data.data || { ...skillData, id };
   const localSkills = getStored('skills', initialSkills);
-  const updatedList = localSkills.map(s => String(s.id) === String(id) ? { ...s, ...skillData, id } : s);
+  const updatedList = localSkills.map(s => String(s.id) === String(id) ? updated : s);
   setStored('skills', updatedList);
-
-  try {
-    const res = await fetch(`${API_BASE}/admin/skills/${id}`, {
-      method: 'PUT',
-      headers: authHeaders(),
-      body: JSON.stringify(skillData)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return data.data;
-    }
-  } catch (e) {}
-  return updatedList.find(s => String(s.id) === String(id));
+  return updated;
 }
 
 export async function deleteSkill(id) {
+  const res = await fetch(`${API_BASE}/admin/skills/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(errorJson.message || `Failed to delete skill (${res.status})`);
+  }
   const localSkills = getStored('skills', initialSkills);
   const filtered = localSkills.filter(s => String(s.id) !== String(id));
   setStored('skills', filtered);
-
-  try {
-    await fetch(`${API_BASE}/admin/skills/${id}`, {
-      method: 'DELETE',
-      headers: authHeaders()
-    });
-  } catch (e) {}
   return true;
 }
 
@@ -288,16 +268,20 @@ export async function getExperience() {
 }
 
 export async function updateExperience(id, data) {
+  const res = await fetch(`${API_BASE}/admin/experience/${id}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(errorJson.message || `Failed to update experience (${res.status})`);
+  }
+  const resJson = await res.json();
+  const updated = resJson.data || { ...data, id };
   const list = getStored('experience', initialExperience);
-  const updated = list.map(item => String(item.id) === String(id) ? { ...item, ...data, id } : item);
-  setStored('experience', updated);
-  try {
-    await fetch(`${API_BASE}/admin/experience/${id}`, {
-      method: 'PUT',
-      headers: authHeaders(),
-      body: JSON.stringify(data)
-    });
-  } catch (e) {}
+  const updatedList = list.map(item => String(item.id) === String(id) ? updated : item);
+  setStored('experience', updatedList);
   return updated;
 }
 
@@ -383,27 +367,31 @@ export async function getAdminMessages() {
 }
 
 export async function markMessageRead(id) {
+  const res = await fetch(`${API_BASE}/admin/messages/${id}/read`, {
+    method: 'PATCH',
+    headers: authHeaders()
+  });
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(errorJson.message || `Failed to mark message as read (${res.status})`);
+  }
   const existing = getStored('messages', []);
   const updated = existing.map(m => m.id === id ? { ...m, isRead: true } : m);
   setStored('messages', updated);
-  try {
-    await fetch(`${API_BASE}/admin/messages/${id}/read`, {
-      method: 'PATCH',
-      headers: authHeaders()
-    });
-  } catch (e) {}
 }
 
 export async function deleteMessage(id) {
+  const res = await fetch(`${API_BASE}/admin/messages/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => ({}));
+    throw new Error(errorJson.message || `Failed to delete message (${res.status})`);
+  }
   const existing = getStored('messages', []);
   const updated = existing.filter(m => m.id !== id);
   setStored('messages', updated);
-  try {
-    await fetch(`${API_BASE}/admin/messages/${id}`, {
-      method: 'DELETE',
-      headers: authHeaders()
-    });
-  } catch (e) {}
 }
 
 // --- Admin Auth API ---
@@ -414,33 +402,126 @@ export async function loginAdmin(username, password) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.data && data.data.token) {
-        setAuthToken(data.data.token);
-        return { success: true, data: data.data };
-      }
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.data && data.data.token) {
+      setAuthToken(data.data.token);
+      return { success: true, data: data.data };
     }
-  } catch (e) {
-    // backend offline - allow demo local admin if credentials match default
-  }
-
-  if (username === 'admin' && (password === 'AdminPassword@2026' || password === 'admin' || password === 'admin123')) {
-    const mockToken = 'mock_jwt_admin_' + Date.now();
-    setAuthToken(mockToken);
     return {
-      success: true,
-      data: {
-        token: mockToken,
-        username: 'admin',
-        role: 'ROLE_ADMIN'
-      }
+      success: false,
+      message: data.message || "Invalid administrator credentials."
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: "Unable to connect to backend authentication service. Ensure the Spring Boot backend is running on port 8080."
     };
   }
-
-  return { success: false, message: "Invalid credentials. Use username: admin and password: AdminPassword@2026" };
 }
 
 export function logoutAdmin() {
   setAuthToken(null);
+}
+
+export async function forgotPassword(email) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success) {
+      return { success: true, message: data.message, data: data.data };
+    }
+    return {
+      success: false,
+      message: data.message || "Failed to initiate password reset. Ensure the email belongs to the administrator."
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: "Unable to reach backend service. Please check connection."
+    };
+  }
+}
+
+export async function resetPassword(email, otp, newPassword) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp, newPassword })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success) {
+      return { success: true, message: data.message };
+    }
+    return {
+      success: false,
+      message: data.message || "Invalid or expired verification code."
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: "Unable to reach backend service. Please check connection."
+    };
+  }
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  const token = getAuthToken();
+  try {
+    const res = await fetch(`${API_BASE}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success) {
+      return { success: true, message: data.message };
+    }
+    return {
+      success: false,
+      message: data.message || "Failed to update password. Verify current password."
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: "Unable to reach backend service."
+    };
+  }
+}
+
+export async function uploadFile(file, type) {
+  const token = getAuthToken();
+  const formData = new FormData();
+  formData.append('file', file);
+  if (type) formData.append('type', type);
+
+  try {
+    const res = await fetch(`${API_BASE}/admin/upload`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: formData
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success) {
+      return { success: true, message: data.message, data: data.data };
+    }
+    return {
+      success: false,
+      message: data.message || "Failed to upload file."
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: "Unable to upload to backend server."
+    };
+  }
 }

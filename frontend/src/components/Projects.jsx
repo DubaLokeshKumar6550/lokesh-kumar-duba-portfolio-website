@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ProjectCard from './ProjectCard';
 import { FolderGit2, Search, Filter, Plus, Shield } from 'lucide-react';
+import { isAuthenticated } from '../services/api';
 
 export default function Projects({ projects, onSelectProject, onNavigate }) {
   const [filterStatus, setFilterStatus] = useState('ALL');
@@ -91,15 +92,17 @@ export default function Projects({ projects, onSelectProject, onNavigate }) {
               />
             </div>
 
-            <button
-              onClick={() => onNavigate('admin', 'projects')}
-              className="btn btn-secondary"
-              style={{ padding: '0.55rem 0.95rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-              title="Add or edit projects via Admin Dashboard"
-            >
-              <Plus size={14} />
-              <span>Add / Manage</span>
-            </button>
+            {isAuthenticated() && (
+              <button
+                onClick={() => onNavigate('admin', 'projects')}
+                className="btn btn-secondary"
+                style={{ padding: '0.55rem 0.95rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                title="Add or edit projects via Admin Dashboard"
+              >
+                <Plus size={14} />
+                <span>Add / Manage</span>
+              </button>
+            )}
           </div>
         </div>
 

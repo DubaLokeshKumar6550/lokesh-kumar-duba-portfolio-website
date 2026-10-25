@@ -29,8 +29,15 @@ public class Profile {
     private String phone;
     private String githubUrl;
     private String linkedinUrl;
+
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String photoUrl;
+
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String resumeUrl;
+
     private Boolean availableForWork = true;
 
     public Profile() {}

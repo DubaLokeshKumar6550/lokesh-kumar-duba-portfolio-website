@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class DatabaseInitializer implements CommandLineRunner {
@@ -55,8 +56,18 @@ public class DatabaseInitializer implements CommandLineRunner {
     }
 
     private void seedAdminUser() {
-        if (adminUserRepository.findByUsername(adminUsername).isEmpty()) {
+        Optional<AdminUser> existing = adminUserRepository.findByUsername(adminUsername);
+        if (existing.isEmpty()) {
+            existing = adminUserRepository.findByEmail(adminEmail);
+        }
+        if (existing.isEmpty()) {
             AdminUser admin = new AdminUser(adminUsername, adminPassword, adminEmail);
+            admin.setRole("ROLE_ADMIN");
+            adminUserRepository.save(admin);
+        } else {
+            AdminUser admin = existing.get();
+            admin.setEmail(adminEmail);
+            admin.setRole("ROLE_ADMIN");
             adminUserRepository.save(admin);
         }
     }

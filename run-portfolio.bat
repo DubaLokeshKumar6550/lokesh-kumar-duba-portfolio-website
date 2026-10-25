@@ -16,7 +16,7 @@ echo.
 echo ===================================================================
 echo Portfolio services are launching!
 echo - Public Website:  http://localhost:5173
-echo - Admin Portal:    http://localhost:5173/admin (admin / AdminPassword@2026)
+echo - Admin Portal:    http://localhost:5173/admin
 echo - Backend REST:    http://localhost:8080/api/health
 echo ===================================================================
 pause
