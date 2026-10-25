@@ -7,7 +7,15 @@ import {
   initialCertifications
 } from './initialData';
 
-const API_BASE = 'http://localhost:8080/api';
+// Determine API base: in dev (Vite proxy) use relative '/api' to bypass CORS, otherwise absolute URL
+const getApiBase = () => {
+  if (typeof window !== 'undefined' && window.location.origin) {
+    return '/api';
+  }
+  return 'http://localhost:8080/api';
+};
+
+const API_BASE = getApiBase();
 
 // Helper for local storage initialization
 const getStored = (key, fallback) => {
@@ -29,17 +37,25 @@ const setStored = (key, value) => {
 
 // Check if backend is alive
 export async function checkBackendHealth() {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
-    const res = await fetch(`${API_BASE}/health`, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (res.ok) {
-      const data = await res.json();
-      return { isOnline: true, data: data.data };
+  const candidateUrls = [
+    `${API_BASE}/health`,
+    'http://localhost:8080/api/health',
+    'http://127.0.0.1:8080/api/health'
+  ];
+
+  for (const url of candidateUrls) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json();
+        return { isOnline: true, data: data.data };
+      }
+    } catch (e) {
+      // Try next candidate URL
     }
-  } catch (e) {
-    // Backend offline
   }
   return { isOnline: false, data: null };
 }
@@ -394,29 +410,43 @@ export async function deleteMessage(id) {
   setStored('messages', updated);
 }
 
+// Candidate base URLs for auth operations to ensure connectivity regardless of proxy or localhost resolution
+const getCandidateBases = () => {
+  const set = new Set([API_BASE, 'http://localhost:8080/api', 'http://127.0.0.1:8080/api']);
+  return Array.from(set);
+};
+
 // --- Admin Auth API ---
 export async function loginAdmin(username, password) {
-  try {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.data && data.data.token) {
-      setAuthToken(data.data.token);
-      return { success: true, data: data.data };
+  const bases = getCandidateBases();
+  let lastError = null;
+
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.data && data.data.token) {
+        setAuthToken(data.data.token);
+        return { success: true, data: data.data };
+      }
+      return {
+        success: false,
+        message: data.message || "Invalid administrator credentials."
+      };
+    } catch (e) {
+      lastError = e;
+      // Try next base URL
     }
-    return {
-      success: false,
-      message: data.message || "Invalid administrator credentials."
-    };
-  } catch (e) {
-    return {
-      success: false,
-      message: "Unable to connect to backend authentication service. Ensure the Spring Boot backend is running on port 8080."
-    };
   }
+
+  return {
+    success: false,
+    message: "Unable to connect to backend authentication service. Ensure the Spring Boot backend is running on port 8080."
+  };
 }
 
 export function logoutAdmin() {
@@ -424,49 +454,59 @@ export function logoutAdmin() {
 }
 
 export async function forgotPassword(email) {
-  try {
-    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.success) {
-      return { success: true, message: data.message, data: data.data };
+  const bases = getCandidateBases();
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        return { success: true, message: data.message, data: data.data };
+      }
+      return {
+        success: false,
+        message: data.message || "Failed to initiate password reset. Ensure the email belongs to the administrator."
+      };
+    } catch (e) {
+      // Try next base
     }
-    return {
-      success: false,
-      message: data.message || "Failed to initiate password reset. Ensure the email belongs to the administrator."
-    };
-  } catch (e) {
-    return {
-      success: false,
-      message: "Unable to reach backend service. Please check connection."
-    };
   }
+
+  return {
+    success: false,
+    message: "Unable to reach backend service. Please check connection."
+  };
 }
 
 export async function resetPassword(email, otp, newPassword) {
-  try {
-    const res = await fetch(`${API_BASE}/auth/reset-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, otp, newPassword })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.success) {
-      return { success: true, message: data.message };
+  const bases = getCandidateBases();
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, newPassword })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        return { success: true, message: data.message };
+      }
+      return {
+        success: false,
+        message: data.message || "Invalid or expired verification code."
+      };
+    } catch (e) {
+      // Try next base
     }
-    return {
-      success: false,
-      message: data.message || "Invalid or expired verification code."
-    };
-  } catch (e) {
-    return {
-      success: false,
-      message: "Unable to reach backend service. Please check connection."
-    };
   }
+
+  return {
+    success: false,
+    message: "Unable to reach backend service. Please check connection."
+  };
 }
 
 export async function changePassword(currentPassword, newPassword) {
